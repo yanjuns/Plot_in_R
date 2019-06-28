@@ -15,34 +15,57 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-## the Goal of this file is to take advantage of ggplot in R to generate plot from MATLAB data
+### the Goal of this file is to take advantage of ggplot in R to generate plot from MATLAB data
+
+## setup
+```{r setup, message = FALSE, warning = FALSE, results = 'hide'}
+#search required packages, install them if missing
+pkgs_needed = c("dplyr", "ggplot2", "R.matlab", "tidyr")
+letsinstall = setdiff(pkgs_needed, installed.packages()) 
+if (length(letsinstall) > 0) {
+  BiocManager::install(letsinstall)
+}
+
+#load required packages
+library("dplyr")
+library("ggplot2")
+library("R.matlab")
+library("tidyr")
+
+```
+
 
 ## Load data from MATLAB and tranform it into data frame
 ```{r}
-#load required libraries
-library(R.matlab)
-library(tidyr)
-
 #load .mat file to R and change it to data frame
-x = readMat("test_corr.mat")
-x = data.frame(x[[1]])
+mat_data = readMat("test_data.mat")
+r_data = data.frame(mat_data[[1]])
 
 #rename and transform
-test_corr <- dplyr::rename(x, Ctrl.vs.pCtrl = X1,  Ctrl.vs.CNO = X2, CNO.vs.pCtrl = X3)
-test_corr <- gather(test_corr, Ctrl.vs.pCtrl, Ctrl.vs.CNO, CNO.vs.pCtrl, key = "condition", value = "correlation")
-head(test_corr)
+r_data <- dplyr::rename(r_data, Ctrl.vs.pCtrl = X1,  Ctrl.vs.saline = X2, saline.vs.pCtrl = X3)
+my_data <- gather(r_data, Ctrl.vs.pCtrl, Ctrl.vs.saline, saline.vs.pCtrl, key = "condition", value = "correlation")
+head(my_data)
 ```
 
 ## Generate plots
 ```{r fig.width = 5, fig.height = 5}
 #make an violin plot
-ggplot(test_corr, aes(x = condition, y = correlation)) + 
+ggplot(my_data, aes(x = condition, y = correlation)) + 
   geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
   geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
 
 #make a box plot
-ggplot(test_corr, aes(x = condition, y = correlation)) + 
+ggplot(my_data, aes(x = condition, y = correlation)) + 
   geom_boxplot() +
   geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
+
+```
+
+## Statistic tests
+```{r}
+x = dplyr::filter(my_data, condition == "Ctrl.vs.pCtrl")
+y = dplyr::filter(my_data, condition == "Ctrl.vs.saline")
+stat_test = t.test(x$correlation, y$correlation, paired = TRUE, alternative = "two.sided")
+stat_test
 
 ```
