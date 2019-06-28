@@ -1,0 +1,48 @@
+---
+title: "Plot_in_R"
+author: "Yanjun Sun"
+date: "6/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+## the Goal of this file is to take advantage of ggplot in R to generate plot from MATLAB data
+
+## Load data from MATLAB and tranform it into data frame
+```{r}
+#load required libraries
+library(R.matlab)
+library(tidyr)
+
+#load .mat file to R and change it to data frame
+x = readMat("test_corr.mat")
+x = data.frame(x[[1]])
+
+#rename and transform
+test_corr <- dplyr::rename(x, Ctrl.vs.pCtrl = X1,  Ctrl.vs.CNO = X2, CNO.vs.pCtrl = X3)
+test_corr <- gather(test_corr, Ctrl.vs.pCtrl, Ctrl.vs.CNO, CNO.vs.pCtrl, key = "condition", value = "correlation")
+head(test_corr)
+```
+
+## Generate plots
+```{r fig.width = 5, fig.height = 5}
+#make an violin plot
+ggplot(test_corr, aes(x = condition, y = correlation)) + 
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+  geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
+
+#make a box plot
+ggplot(test_corr, aes(x = condition, y = correlation)) + 
+  geom_boxplot() +
+  geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
+
+```
