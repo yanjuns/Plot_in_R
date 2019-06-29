@@ -38,8 +38,8 @@ library("tidyr")
 ## Load data from MATLAB and tranform it into data frame
 ```{r}
 #load .mat file to R and change it to data frame
-mat_data = readMat("test_data.mat")
-r_data = data.frame(mat_data[[1]])
+mat_data <- readMat("test_data.mat")
+r_data <- data.frame(mat_data[[1]])
 
 #rename and transform
 r_data <- dplyr::rename(r_data, Ctrl.vs.pCtrl = X1,  Ctrl.vs.saline = X2, saline.vs.pCtrl = X3)
@@ -58,6 +58,20 @@ ggplot(my_data, aes(x = condition, y = correlation)) +
 ggplot(my_data, aes(x = condition, y = correlation)) + 
   geom_boxplot() +
   geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
+```
+
+## Generate more plots
+```{r}
+#make a histogram of whole data
+ggplot(my_data, aes(x = correlation)) +
+  geom_histogram(bins = 50)
+
+#make a histogram with facet
+my_data2 <- select(my_data, correlation) #select specific data using dplyr::select
+ggplot(my_data, aes(x = correlation, fill = condition)) +
+  geom_histogram(data = my_data2, bins = 100, fill = "grey", alpha = 0.5) +
+  geom_histogram(bins = 100) + 
+  facet_wrap(~ condition, ncol = 2)
 
 ```
 
