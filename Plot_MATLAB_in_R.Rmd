@@ -38,12 +38,12 @@ library("tidyr")
 ## Load data from MATLAB and tranform it into data frame
 ```{r}
 #load .mat file to R and change it to data frame
-mat_data <- readMat("test_data.mat")
-r_data <- data.frame(mat_data[[1]])
+mat_data <- readMat("Corr_LR_saline.mat")
+r_data <- data.frame(mat_data[[2]])
 
 #rename and transform
-r_data <- dplyr::rename(r_data, Ctrl.vs.pCtrl = X1,  Ctrl.vs.saline = X2, saline.vs.pCtrl = X3)
-my_data <- gather(r_data, Ctrl.vs.pCtrl, Ctrl.vs.saline, saline.vs.pCtrl, key = "condition", value = "correlation")
+r_data <- dplyr::rename(r_data, Baseline1 = X1,  Baseline2 = X2, Test1 = X3, Test2 = X4)
+my_data <- gather(r_data, Baseline1, Baseline2, Test1, Test2, key = "condition", value = "correlation")
 head(my_data)
 ```
 
@@ -77,8 +77,8 @@ ggplot(my_data, aes(x = correlation, fill = condition)) +
 
 ## Statistic tests
 ```{r}
-x = dplyr::filter(my_data, condition == "Ctrl.vs.pCtrl")
-y = dplyr::filter(my_data, condition == "Ctrl.vs.saline")
+x = dplyr::filter(my_data, condition == "Baseline2")
+y = dplyr::filter(my_data, condition == "Test1")
 stat_test = t.test(x$correlation, y$correlation, paired = TRUE, alternative = "two.sided")
 stat_test
 
@@ -87,6 +87,16 @@ stat_test
 ## try mixtures for correlations
 ```{r}
 library("mixtools")
-gm =normalmixEM(my_data2[[1]], k = 2, lambda =c(0.5, 0.5), mu =c(0.2, 0.75), sigma =c(0.1, 0.1))
+gm2 =normalmixEM(my_data2[[1]], k = 2, lambda =c(0.5, 0.5), mu =c(0.2, 0.75), sigma =c(0.1, 0.1))
+gm3 =normalmixEM(my_data2[[1]], k = 3, lambda =c(0.5, 0.5, 0.5), mu =c(-0.1, 0.2, 0.75), sigma =c(0.1, 0.1, 0.1))
+
+comp1 = tibble(x =seq(-1, 1, length.out =1000),f = gm2[["lambda"]][1]*dnorm(x, mean = gm2[["mu"]][1], sd = gm2[["sigma"]][1])) 
+                     
+comp2 = tibble(x =seq(-1, 1, length.out =1000), f = gm2[["lambda"]][2]*dnorm(x, mean = gm2[["mu"]][2], sd = gm2[["sigma"]][2]))
+
+ggplot(comp1, aes(x = x, y = f)) +
+  geom_line(color ="red", size =1.5) +
+  geom_line(data = comp2, size = 1.5) +
+  ylab("mixture density")
 
 ```
