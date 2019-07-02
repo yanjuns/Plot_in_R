@@ -20,7 +20,7 @@ When you click the **Knit** button a document will be generated that includes bo
 ## setup
 ```{r setup, message = FALSE, warning = FALSE, results = 'hide'}
 #search required packages, install them if missing
-pkgs_needed = c("dplyr", "ggplot2", "R.matlab", "tidyr")
+pkgs_needed = c("dplyr", "ggplot2", "R.matlab", "tidyr", "BiocManager", "mixtools")
 letsinstall = setdiff(pkgs_needed, installed.packages()) 
 if (length(letsinstall) > 0) {
   BiocManager::install(letsinstall)
@@ -31,6 +31,8 @@ library("dplyr")
 library("ggplot2")
 library("R.matlab")
 library("tidyr")
+library("BiocManager")
+library("rhdf5")
 
 ```
 
@@ -38,8 +40,10 @@ library("tidyr")
 ## Load data from MATLAB and tranform it into data frame
 ```{r}
 #load .mat file to R and change it to data frame
-mat_data <- readMat("Corr_LR_saline.mat")
-r_data <- data.frame(mat_data[[2]])
+mat_data <- readMat("Test_Saline.mat") #can only read MAT v7 file and below
+mat_data <- h5read("Test_Saline.mat", "corr_LR_saline_pc") # can read MAT v7.3 file, but need to specify var name
+
+r_data <- data.frame(mat_data)
 
 #rename and transform
 r_data <- dplyr::rename(r_data, Baseline1 = X1,  Baseline2 = X2, Test1 = X3, Test2 = X4)
@@ -47,7 +51,7 @@ my_data <- gather(r_data, Baseline1, Baseline2, Test1, Test2, key = "condition",
 head(my_data)
 ```
 
-## Generate plots
+## Generate violin or plots
 ```{r fig.width = 5, fig.height = 5}
 #make an violin plot
 ggplot(my_data, aes(x = condition, y = correlation)) + 
@@ -60,7 +64,7 @@ ggplot(my_data, aes(x = condition, y = correlation)) +
   geom_jitter(aes(color = condition), alpha = 0.25, width = 0.2, height = 0)
 ```
 
-## Generate more plots
+## Generate histogram plots
 ```{r}
 #make a histogram of whole data
 ggplot(my_data, aes(x = correlation)) +
@@ -74,7 +78,14 @@ ggplot(my_data, aes(x = correlation, fill = condition)) +
   facet_wrap(~ condition, ncol = 2)
 
 ```
+## Generate eCDF plots
+```{r}
+ggplot(my_data, aes(x = correlation, color = condition)) + 
+  stat_ecdf(geom = "step", size = 1) +
+  facet_wrap(~ condition, ncol = 2) +
+  ylab("Cumulative proportion")
 
+```
 ## Statistic tests
 ```{r}
 x = dplyr::filter(my_data, condition == "Baseline2")
@@ -90,13 +101,21 @@ library("mixtools")
 gm2 =normalmixEM(my_data2[[1]], k = 2, lambda =c(0.5, 0.5), mu =c(0.2, 0.75), sigma =c(0.1, 0.1))
 gm3 =normalmixEM(my_data2[[1]], k = 3, lambda =c(0.5, 0.5, 0.5), mu =c(-0.1, 0.2, 0.75), sigma =c(0.1, 0.1, 0.1))
 
-comp1 = tibble(x =seq(-1, 1, length.out =1000),f = gm2[["lambda"]][1]*dnorm(x, mean = gm2[["mu"]][1], sd = gm2[["sigma"]][1])) 
+comp1 = tibble(x =seq(-1, 1, length.out =1000),f = gm3[["lambda"]][1]*dnorm(x, mean = gm3[["mu"]][1], sd = gm3[["sigma"]][1])) 
                      
-comp2 = tibble(x =seq(-1, 1, length.out =1000), f = gm2[["lambda"]][2]*dnorm(x, mean = gm2[["mu"]][2], sd = gm2[["sigma"]][2]))
+comp2 = tibble(x =seq(-1, 1, length.out =1000), f = gm3[["lambda"]][2]*dnorm(x, mean = gm3[["mu"]][2], sd = gm3[["sigma"]][2]))
+
+# comp3 = tibble(x =seq(-1, 1, length.out =1000), f = gm3[["lambda"]][3]*dnorm(x, mean = gm3[["mu"]][3], sd = gm3[["sigma"]][3]))
 
 ggplot(comp1, aes(x = x, y = f)) +
   geom_line(color ="red", size =1.5) +
   geom_line(data = comp2, size = 1.5) +
   ylab("mixture density")
+
+# ggplot(comp1, aes(x = x, y = f)) +
+#   geom_line(color ="red", size =1.5) +
+#   geom_line(data = comp2, size = 1.5) +
+#   geom_line(data = comp3, size = 1.5) +
+#   ylab("mixture density")
 
 ```
