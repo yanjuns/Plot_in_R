@@ -1,0 +1,133 @@
+---
+title: "Remapping_GMM"
+author: "Yanjun Sun"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# This code aims to build a gaussian mixture model (GMM) on recorded place cells with global remapping vs. rate remapping. 
+
+## setup
+```{r setup, message = FALSE, warning = FALSE, results = 'hide'}
+#search required packages, install them if missing
+pkgs_needed = c("dplyr", "ggplot2", "R.matlab", "rhdf5", "tidyr", "BiocManager", "mixtools")
+letsinstall = setdiff(pkgs_needed, installed.packages()) 
+if (length(letsinstall) > 0) {
+  BiocManager::install(letsinstall)
+}
+
+#load required packages
+library("dplyr")
+library("ggplot2")
+library("R.matlab")
+library("tidyr")
+library("BiocManager")
+library("rhdf5")
+library("mixtools")
+
+```
+
+## Monte Carlo simulation of gaussian mixttures with 2 or 3 different gaussian distributions
+```{r, message = FALSE, warning = FALSE}
+#simulation of random guassians
+set.seed(07092019)
+mus = c(-0.2, 0.2, 0.7)
+sigmas = c(0.4, 0.3, 0.2)
+G1 = rnorm(2000, mus[1], sigmas[1])
+G2 = rnorm(2000, mus[2], sigmas[2])
+G3 = rnorm(2000, mus[3], sigmas[3])
+
+mixG2 = c(G2, G3)
+mixG3 = c(G1, G2, G3)
+
+#plot simulated gaussian mixture with 2 or 3 comps
+ggplot(data.frame(mixG2), aes(x = mixG2)) +
+  geom_histogram(binwidth = 0.05, alpha = 0.3) +
+  geom_histogram(data = data.frame(G2), aes(x = G2), binwidth=0.05, alpha = 0.5, fill = "#619CFF") +
+  geom_histogram(data = data.frame(G3), aes(x = G3), binwidth=0.05, alpha = 0.5, fill = "#00BA38") +
+  xlab("Values") + 
+  ggtitle("Mixture of two gaussians")
+
+ggplot(data.frame(mixG3), aes(x = mixG3)) +
+  geom_histogram(binwidth = 0.05, alpha = 0.3) +
+  geom_histogram(data = data.frame(G1), aes(x = G1), binwidth=0.05, alpha = 0.5, fill = "#F8766D") +
+  geom_histogram(data = data.frame(G2), aes(x = G2), binwidth=0.05, alpha = 0.5, fill = "#619CFF") +
+  geom_histogram(data = data.frame(G3), aes(x = G3), binwidth=0.05, alpha = 0.5, fill = "#00BA38") +
+  xlab("Values") + 
+  ggtitle("Mixture of three gaussians")
+
+```
+
+## Use Expectation Maximization to deconvolve two mixtures
+```{r}
+#For mixtures of two components
+#use boot.comp to determine how many components are in the data (take long time to run)
+snoq.boot2 = boot.comp(mixG2, max.comp = 10, B = 1000, mix.type = "normalmix")
+#use normalmixEM to deconvolve the data
+gm.sim2 =normalmixEM(mixG2, k = 2, lambda =c(0.5, 0.5), mu =c(0.1, 0.5), sigma =c(0.1, 0.1))
+
+comp.idx = apply(gm.sim2$posterior, 1, which.max)
+mixG2.decomp = data.frame(cbind(mixG2, comp.idx))
+mixG2.decomp$comp.idx <- as.factor(mixG2.decomp$comp.idx)
+
+mixG2.1 = data.frame(mixG2.decomp$mixG2[comp.idx==1])
+colnames(mixG2.1) = "mixG2.1"
+mixG2.2 = data.frame(mixG2.decomp$mixG2[comp.idx==2])
+colnames(mixG2.2) = "mixG2.2"
+
+ggplot(mixG2.1, aes(x = mixG2.1)) +
+  geom_histogram(binwidth=0.05, alpha = 0.5, fill = "#619CFF")+
+  geom_histogram(data = mixG2.2, aes(x = mixG2.2), binwidth=0.05, alpha = 0.5, fill = "#00BA38") +
+  xlab("Values") +
+  ggtitle("EM decomposed results")
+
+ggplot(mixG2.decomp, aes(x = mixG2, fill = comp.idx)) +
+  geom_histogram(alpha = 0.5)+
+  facet_wrap(~comp.idx)
+```
+
+## Use Expectation Maximization to deconvolve three mixtures
+```{r}
+#For mixtures of three components
+##use boot.comp to determine how many components are in the data (take long time to run)
+snoq.boot3 = boot.comp(mixG3, max.comp = 10, B = 1000, mix.type = "normalmix")
+##use normalmixEM to deconvolve the data
+gm.sim3 =normalmixEM(mixG3, k = 3, lambda =c(0.3, 0.3, 0.3), mu =c(-0.2, 0.1, 0.7), sigma =c(0.4, 0.3, 0.2))
+
+##use the results from normalmixEM to assign mixed data to each component
+comp.idx = apply(gm.sim3$posterior, 1, which.max)
+mixG3.decomp = data.frame(cbind(mixG3, comp.idx))
+mixG3.decomp$comp.idx <- as.factor(mixG3.decomp$comp.idx)
+
+mixG3.1 = data.frame(mixG3.decomp$mixG3[comp.idx==1])
+colnames(mixG3.1) = "mixG3.1"
+mixG3.2 = data.frame(mixG3.decomp$mixG3[comp.idx==2])
+colnames(mixG3.2) = "mixG3.2"
+mixG3.3 = data.frame(mixG3.decomp$mixG3[comp.idx==3])
+colnames(mixG3.3) = "mixG3.3"
+
+ggplot(mixG3.1, aes(x = mixG3.1)) +
+  geom_histogram(binwidth=0.05, alpha = 0.5, fill = "#F8766D")+
+  geom_histogram(data = mixG3.2, aes(x = mixG3.2), binwidth=0.05, alpha = 0.5, fill = "#619CFF") +
+  geom_histogram(data = mixG3.3, aes(x = mixG3.3), binwidth=0.05, alpha = 0.5, fill = "#00BA38") + 
+  xlab("Values") +
+  ggtitle("EM decomposed results")
+
+ggplot(mixG3.decomp, aes(x = mixG3, fill = comp.idx)) +
+  geom_histogram(alpha = 0.5)+
+  facet_wrap(~comp.idx)
+```
+
+## Try to build a model
+```{r}
+#model built
+comp1 = tibble(x =seq(-1, 1, length.out =1000),f = gm2[["lambda"]][1]*dnorm(x, mean = gm2[["mu"]][1], sd = gm2[["sigma"]][1])) 
+                     
+comp2 = tibble(x =seq(-1, 1, length.out =1000), f = gm2[["lambda"]][2]*dnorm(x, mean = gm2[["mu"]][2], sd = gm2[["sigma"]][2]))
+
+```
+
